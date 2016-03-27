@@ -1,0 +1,12 @@
+{
+  "mysql": {
+    "host"     : "127.0.0.1",
+    "user"     : "user1",
+    "password" : "pass1",
+    "database" : "base1"
+  },
+
+  "snooping_host_mac": "00:aa:dd:cd:bb:00",
+  "dns_servers": ["2.2.2.2", "8.8.8.8"]
+
+}
