@@ -7,6 +7,10 @@
   },
 
   "snooping_host_mac": "00:aa:dd:cd:bb:00",
-  "dns_servers": ["2.2.2.2", "8.8.8.8"]
+  "dns_servers": ["2.2.2.2", "8.8.8.8"],
+  "siaddr": "91.88.49.48",
+  "domainName": "xxx.ru",
+  "ntpServers": ["195.88.221.65"],
+  "serverIdentifier": "91.88.49.48"
 
 }

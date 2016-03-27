@@ -8,18 +8,14 @@ var config = require('./config.json');
 
 
 
-
-server.on('message', function(m,rinfo) {
-    console.log(util.inspect(m, false, 3));
-});
-
 server.on('dhcpDiscover', function(m,rinfo) {
     console.log("--------------------------------------");
     console.log(getDate() + ' -> ' +  m.chaddr.address + ' dhcpDiscover');
     console.log(m);
-    if (m.opt82) {
-        billing.getIP(m.opt82, function (client) {
+    if (m && m.opt82) {
+        billing.getIP(m, function (client) {
             if (client) {
+                console.log(client);
                 var message = defaultPktReply(m,client);
                 message.options.dhcpMessageType = dhcpjs.Protocol.DHCPMessageType.DHCPOFFER;
                 server.sendPacket(bufOffer, {host: rinfo.address, port: rinfo.port}, function () {
@@ -28,6 +24,7 @@ server.on('dhcpDiscover', function(m,rinfo) {
             }
         });
     }
+
 });
 
 
@@ -36,15 +33,33 @@ server.on('dhcpRequest', function(m,rinfo) {
     console.log("--------------------------------------");
     console.log(getDate() + ' -> ' +  m.chaddr.address + ' dhcpRequest');
     console.log(m);
-    if (m.opt82) {
-        billing.getIP(m.opt82, function (client) {
-            if (client) {
+
+    if (m && ( m.opt82 || m.options.requestedIpAddress )) {
+        billing.getIP(m, function (client) {
+            if (client && client.ip == m.options.requestedIpAddress) {
+                console.log(client);
                 var message = defaultPktReply(m,client);
                 var bufAck = server.createPacket(message);
                 server.sendPacket(bufAck, {host: rinfo.address, port: rinfo.port}, function () {
                     console.log("ACK sent");
                 });
+            } else {
+                var nak_client = { ip: "0.0.0.0", mask: "255.255.255.255", gw: "0.0.0.0", leaseTime: 60 };
+                var nak_message = defaultPktReply(m,nak_client);
+                nak_message.options.dhcpMessageType = dhcpjs.Protocol.DHCPMessageType.DHCPNAK;
+                var bufNak = server.createPacket(nak_message);
+                server.sendPacket(bufNak, {host: rinfo.address, port: rinfo.port}, function () {
+                    console.log("NAK sent (client.ip != m.options.requestedIpAddress)");
+                });
             }
+        });
+    } else {
+        var nak_client = { ip: "0.0.0.0", mask: "255.255.255.255", gw: "0.0.0.0", leaseTime: 60 };
+        var nak_message = defaultPktReply(m,nak_client);
+        nak_message.options.dhcpMessageType = dhcpjs.Protocol.DHCPMessageType.DHCPNAK;
+        var bufNak = server.createPacket(nak_message);
+        server.sendPacket(bufNak, {host: rinfo.address, port: rinfo.port}, function () {
+            console.log("NAK sent");
         });
     }
 });
@@ -65,7 +80,15 @@ server.on('dhcpInform', function(m,rinfo) {
     console.log("--------------------------------------");
     console.log(getDate() + ' -> ' +  m.chaddr.address + " dhcpInform");
     console.log(m);
-    // sendPacket(m,rinfo,dhcpjs.Protocol.DHCPMessageType.DHCPACK);
+    billing.getIP(m, function (client) {
+        if (client) {
+            var message = defaultPktReply(m,client);
+            var bufAck = server.createPacket(message);
+            server.sendPacket(bufAck, {host: rinfo.address, port: rinfo.port}, function () {
+                console.log("ACK sent");
+            });
+        }
+    });
 });
 
 
@@ -80,8 +103,7 @@ server.bind();
 
 
 function getDate() {
-    var date = new Date().toISOString();
-    return date;
+    return new Date().toISOString();
 }
 
 
@@ -98,52 +120,21 @@ function defaultPktReply(m,client) {
         chaddr: m.chaddr.address,           // Аппаратный адрес
         //ciaddr: '0.0.0.0',
         yiaddr: client.ip,      // Новый IP-адрес клиента, предложенный сервером.
-        siaddr: '91.221.49.48',      // IP-адрес сервера. Возвращается в предложении DHCP
+        siaddr: config.siaddr,      // IP-адрес сервера. Возвращается в предложении DHCP
         giaddr: m.giaddr,
         options: {
             dhcpMessageType: dhcpjs.Protocol.DHCPMessageType.DHCPACK,
-            domainName: "home-nadym.ru",
+            domainName: config.domainName,
             subnetMask: client.mask,
             routerOption: client.gw,
             ipAddressLeaseTime: client.leaseTime,
             domainNameServerOption: config.dns_servers,
-            ntpServers: ["195.191.221.65"],
-            serverIdentifier: "91.221.49.48"     // ?????
+            ntpServers: config.ntpServers,
+            serverIdentifier: config.serverIdentifier     // ?????
         }
     }
 }
 
-
-// Разбираем option 82 на компоненты --------------------------------------------------------------
-function getOpt82(m) {
-    if ( m && m.options && m.xid && m.options.relayAgentInformation && m.options.relayAgentInformation.agentCircuitId && m.options.relayAgentInformation.agentRemoteId && m.options.dhcpMessageType) {
-        if (m.options.relayAgentInformation.agentRemoteId.length > 12) {
-            m.options.relayAgentInformation.agentRemoteId = m.options.relayAgentInformation.agentRemoteId.substr(4);
-        }
-        var mac = m.options.relayAgentInformation.agentRemoteId.substr(0);
-        var vlan = "";
-        var port = "";
-        if (m.options.relayAgentInformation.agentCircuitId.length > 12) {
-            vlan = m.options.relayAgentInformation.agentCircuitId.substr(4,4);
-            port = m.options.relayAgentInformation.agentCircuitId.substr(12,4);
-        } else {
-            vlan = m.options.relayAgentInformation.agentCircuitId.substr(4,4);
-            port = m.options.relayAgentInformation.agentCircuitId.substr(10,2);
-        }
-        return {
-            mac: mac.match( /.{1,2}/g ).join( ':' ),
-            vlan: parseInt(vlan, 16),
-            port: parseInt(port, 16),
-            dhcpMessageType: m.options.dhcpMessageType.name,
-            chaddr: m.chaddr.address,
-            xid: m.xid
-        }
-    } else if ( m && m.options && m.options.dhcpMessageType && m.options.dhcpMessageType.value == 3 && m.chaddr && m.chaddr.address && m.ciaddr && m.xid) {
-        return { chaddr: m.chaddr.address, ciaddr: m.ciaddr, xid: m.xid }
-    } else {
-        return { }
-    }
-}
 
 
 
