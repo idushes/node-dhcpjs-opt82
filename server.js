@@ -1,15 +1,15 @@
+"use strict";
+
 var util = require('util');
 var dhcpjs = require('./lib');
-var server = dhcpjs.createServer();
 var console = require('better-console');
 var billing = require('./lib/billing');
 var config = require('./config.json');
 
 
-
+var server = dhcpjs.createServer();
 
 server.on('dhcpDiscover', function(m,rinfo) {
-    console.log("--------------------------------------");
     console.log(getDate() + ' -> ' +  m.chaddr.address + ' dhcpDiscover');
     console.log(m);
     if (m && m.opt82) {
@@ -18,6 +18,7 @@ server.on('dhcpDiscover', function(m,rinfo) {
                 console.log(client);
                 var message = defaultPktReply(m,client);
                 message.options.dhcpMessageType = dhcpjs.Protocol.DHCPMessageType.DHCPOFFER;
+                var bufOffer = server.createPacket(message);
                 server.sendPacket(bufOffer, {host: rinfo.address, port: rinfo.port}, function () {
                     console.log("Offer sent");
                 });
@@ -30,13 +31,12 @@ server.on('dhcpDiscover', function(m,rinfo) {
 
 
 server.on('dhcpRequest', function(m,rinfo) {
-    console.log("--------------------------------------");
     console.log(getDate() + ' -> ' +  m.chaddr.address + ' dhcpRequest');
     console.log(m);
 
-    if (m && ( m.opt82 || m.options.requestedIpAddress )) {
+    if (m && ( m.opt82 || m.ciaddr || m.options.requestedIpAddress )) {
         billing.getIP(m, function (client) {
-            if (client && client.ip == m.options.requestedIpAddress) {
+            if (client && ( client.ip == m.ciaddr || client.ip == m.options.requestedIpAddress)) {
                 console.log(client);
                 var message = defaultPktReply(m,client);
                 var bufAck = server.createPacket(message);
@@ -49,7 +49,7 @@ server.on('dhcpRequest', function(m,rinfo) {
                 nak_message.options.dhcpMessageType = dhcpjs.Protocol.DHCPMessageType.DHCPNAK;
                 var bufNak = server.createPacket(nak_message);
                 server.sendPacket(bufNak, {host: rinfo.address, port: rinfo.port}, function () {
-                    console.log("NAK sent (client.ip != m.options.requestedIpAddress)");
+                    console.log("NAK sent (client.ip == m.ciaddr || client.ip == m.options.requestedIpAddress)");
                 });
             }
         });
@@ -65,19 +65,16 @@ server.on('dhcpRequest', function(m,rinfo) {
 });
 
 server.on('dhcpRelease', function(m,rinfo) {
-    console.log("--------------------------------------");
     console.log(getDate() + ' -> ' +  m.chaddr.address + " dhcpRelease");
     console.log(m);
 });
 
 server.on('dhcpDecline', function(m,rinfo) {
-    console.log("--------------------------------------");
     console.log(getDate() + ' -> ' +  m.chaddr.address + " dhcpDecline");
     console.log(m);
 });
 
 server.on('dhcpInform', function(m,rinfo) {
-    console.log("--------------------------------------");
     console.log(getDate() + ' -> ' +  m.chaddr.address + " dhcpInform");
     console.log(m);
     billing.getIP(m, function (client) {
@@ -91,6 +88,19 @@ server.on('dhcpInform', function(m,rinfo) {
     });
 });
 
+// ------------------------------------------------------------------------------------------------
+
+server.on('dhcpV6RelayForward', function(m,rinfo) {
+    console.log(getDate() + '  ' + rinfo.address + ' ->  dhcpV6RelayForward');
+    console.log(m);
+    console.log(m.options.dhcpRelayMessage);
+});
+
+server.on('dhcpV6Renew', function(m,rinfo) {
+    console.log(getDate() + '  ' + rinfo.address +' ->  dhcpV6Renew');
+    console.log(m);
+});
+
 
 // ------------------------------------------------------------------------------------------------
 
@@ -98,6 +108,7 @@ server.on('listening', function(address) {
     console.info(getDate() + ' DHCP Server listening on ' + address);
 });
 server.bind();
+server.bind6();
 // Or to specify the port: (usefull for testing)
 //server.bind(null,1067);
 
