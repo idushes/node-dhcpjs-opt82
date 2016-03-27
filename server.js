@@ -1,5 +1,5 @@
 var util = require('util');
-var dhcpjs = require('./node-dhcpjs');
+var dhcpjs = require('./lib');
 var server = dhcpjs.createServer();
 var ip = require('ip');
 var console = require('better-console');
