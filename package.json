@@ -1,0 +1,33 @@
+{
+  "name": "node-dhcpjs-opt82",
+  "version": "1.0.0",
+  "description": "ipv4, ipv6 DHCP Server supported option 82 for ISP",
+  "main": "server.js",
+  "dependencies": {
+    "ip": "^1.1.2",
+    "ip-address": "^5.8.0",
+    "mysql": "^2.10.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/idushes/node-dhcpjs-opt82.git"
+  },
+  "keywords": [
+    "dhcpd",
+    "node",
+    "ipv4",
+    "ipv6",
+    "opt82"
+  ],
+  "author": "Andrew Boyko",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/idushes/node-dhcpjs-opt82/issues"
+  },
+  "homepage": "https://github.com/idushes/node-dhcpjs-opt82#readme"
+}
