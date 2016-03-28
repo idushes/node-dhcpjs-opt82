@@ -10,85 +10,6 @@ var config = require('./config.json');
 
 var server = dhcpjs.createServer();
 
-server.on('dhcpDiscover', function(m,rinfo) {
-    console.log(getDate() + ' -> ' +  m.chaddr.address + ' dhcpDiscover');
-    console.log(m);
-    if (m && m.opt82) {
-        billing.getIP(m, function (client) {
-            if (client) {
-                console.log(client);
-                var message = defaultPktReply(m,client);
-                message.options.dhcpMessageType = dhcpjs.Protocol.DHCPMessageType.DHCPOFFER;
-                var bufOffer = server.createPacket(message);
-                server.sendPacket(bufOffer, {host: rinfo.address, port: rinfo.port}, function () {
-                    console.log("Offer sent");
-                });
-            }
-        });
-    }
-
-});
-
-
-
-server.on('dhcpRequest', function(m,rinfo) {
-    console.log(getDate() + ' -> ' +  m.chaddr.address + ' dhcpRequest');
-    console.log(m);
-
-    if (m && ( m.opt82 || m.ciaddr || m.options.requestedIpAddress )) {
-        billing.getIP(m, function (client) {
-            if (client && ( client.ip == m.ciaddr || client.ip == m.options.requestedIpAddress)) {
-                console.log(client);
-                var message = defaultPktReply(m,client);
-                var bufAck = server.createPacket(message);
-                server.sendPacket(bufAck, {host: rinfo.address, port: rinfo.port}, function () {
-                    console.log("ACK sent");
-                });
-            } else {
-                var nak_client = { ip: "0.0.0.0", mask: "255.255.255.255", gw: "0.0.0.0", leaseTime: 60 };
-                var nak_message = defaultPktReply(m,nak_client);
-                nak_message.options.dhcpMessageType = dhcpjs.Protocol.DHCPMessageType.DHCPNAK;
-                var bufNak = server.createPacket(nak_message);
-                server.sendPacket(bufNak, {host: rinfo.address, port: rinfo.port}, function () {
-                    console.log("NAK sent (client.ip != m.ciaddr || client.ip != m.options.requestedIpAddress) client_ip: ");
-                    console.log(client);
-                });
-            }
-        });
-    } else {
-        var nak_client = { ip: "0.0.0.0", mask: "255.255.255.255", gw: "0.0.0.0", leaseTime: 60 };
-        var nak_message = defaultPktReply(m,nak_client);
-        nak_message.options.dhcpMessageType = dhcpjs.Protocol.DHCPMessageType.DHCPNAK;
-        var bufNak = server.createPacket(nak_message);
-        server.sendPacket(bufNak, {host: rinfo.address, port: rinfo.port}, function () {
-            console.log("NAK sent");
-        });
-    }
-});
-
-server.on('dhcpRelease', function(m,rinfo) {
-    console.log(getDate() + ' -> ' +  m.chaddr.address + " dhcpRelease");
-    console.log(m);
-});
-
-server.on('dhcpDecline', function(m,rinfo) {
-    console.log(getDate() + ' -> ' +  m.chaddr.address + " dhcpDecline");
-    console.log(m);
-});
-
-server.on('dhcpInform', function(m,rinfo) {
-    console.log(getDate() + ' -> ' +  m.chaddr.address + " dhcpInform");
-    console.log(m);
-    billing.getIP(m, function (client) {
-        if (client) {
-            var message = defaultPktReply(m,client);
-            var bufAck = server.createPacket(message);
-            server.sendPacket(bufAck, {host: rinfo.address, port: rinfo.port}, function () {
-                console.log("ACK sent");
-            });
-        }
-    });
-});
 
 // ------------------------------------------------------------------------------------------------
 
@@ -151,8 +72,8 @@ server.on('dhcpV6Renew', function(m,rinfo) {
 server.on('listening', function(address) {
     console.info(getDate() + ' DHCP Server listening on ' + address);
 });
-server.bind();
-// server.bind6();
+
+server.bind6();
 // Or to specify the port: (usefull for testing)
 //server.bind(null,1067);
 
